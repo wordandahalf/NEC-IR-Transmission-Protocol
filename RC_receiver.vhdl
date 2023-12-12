@@ -54,7 +54,6 @@ architecture Implementation of RC_receiver is
     );
     end component;
 begin    
-    -- 7 seg displays receiver s_DATA
     HEX7: hex_to_7_seg port map(o_HEX(7), s_SHIFT_REG(c_MAX_DATA_LENGTH - 1  downto c_MAX_DATA_LENGTH - 4));
     HEX6: hex_to_7_seg port map(o_HEX(6), s_SHIFT_REG(c_MAX_DATA_LENGTH - 5  downto c_MAX_DATA_LENGTH - 8));
     HEX5: hex_to_7_seg port map(o_HEX(5), s_SHIFT_REG(c_MAX_DATA_LENGTH - 9  downto c_MAX_DATA_LENGTH - 12));
@@ -64,22 +63,20 @@ begin
     HEX1: hex_to_7_seg port map(o_HEX(1), s_SHIFT_REG(c_MAX_DATA_LENGTH - 25 downto c_MAX_DATA_LENGTH - 28));
     HEX0: hex_to_7_seg port map(o_HEX(0), s_SHIFT_REG(c_MAX_DATA_LENGTH - 29 downto c_MAX_DATA_LENGTH - 32));
 
-    -- s_DATA comes in inverted
     s_DATA <= not i_DATA;
-    -- output the reading s_DATA signal
     o_DATA <= s_READ_DATA;
-    
+
     process(i_CLK) 
     begin
-        if(rising_edge(i_CLK)) then
-            if(i_RESET = '0') then
+        if rising_edge(i_CLK) then
+            if i_RESET = '0' then
                 s_CURRENT_STATE <= START;
             else
                 s_CURRENT_STATE <= s_NEXT_STATE;
             end if;
         end if;
     end process;
-        
+
     process(s_CURRENT_STATE, s_LEAD_ON_COUNT, s_LEAD_OFF_COUNT, s_COUNT, 
             s_DATA_COUNT, s_DATA, s_DATA_EDGE)
     begin
@@ -88,61 +85,37 @@ begin
         s_READ_LEAD_ON <= '0';
         s_READ_DATA <= '0';
         s_CHECK_DATA <= '0';
-        
+
         case s_CURRENT_STATE is
             when START =>
-                if(s_DATA_EDGE = '1') then
+                if s_DATA_EDGE = '1' then
                     s_NEXT_STATE <= READ_LEAD_ON;
                 end if;
             when READ_LEAD_ON =>
                 s_READ_LEAD_ON <= '1';
-                if(s_DATA = '0') then
-                    s_NEXT_STATE <= CHECK_ON_LENGTH;
-                else
-                    s_NEXT_STATE <= READ_LEAD_ON;
-                end if;
+                s_NEXT_STATE <= CHECK_ON_LENGTH when s_DATA = '0' else READ_LEAD_ON;
             when CHECK_ON_LENGTH =>
-                if(s_LEAD_ON_COUNT < g_LEADER_CODE_LENGTH+c_PADDING_LENGTH) then
-                    s_NEXT_STATE <= READ_LEAD_OFF;
-                else
-                    s_NEXT_STATE <= START;
-                end if;
+                s_NEXT_STATE <= READ_LEAD_OFF when s_LEAD_ON_COUNT < g_LEADER_CODE_LENGTH + c_PADDING_LENGTH else START;
             when READ_LEAD_OFF =>
                 s_READ_LEAD_OFF <= '1';
-                if(s_DATA_EDGE = '1') then
-                    s_NEXT_STATE <= CHECK_OFF_LENGTH;
-                else
-                    s_NEXT_STATE <= READ_LEAD_OFF;
-                end if;
+                s_NEXT_STATE <= CHECK_OFF_LENGTH when s_DATA_EDGE = '1' else READ_LEAD_OFF;
             when CHECK_OFF_LENGTH =>
-                if(s_LEAD_OFF_COUNT < LEAD_OFF_MAX_LENGTH+c_PADDING_LENGTH) then
-                    s_NEXT_STATE <= READ_DATA;
-                else
-                    s_NEXT_STATE <= START;
-                end if;
+                s_NEXT_STATE <= READ_DATA when s_LEAD_OFF_COUNT < LEAD_OFF_MAX_LENGTH + c_PADDING_LENGTH else START;
             when READ_DATA =>
                 s_READ_DATA <= '1';
-                if(s_DATA_EDGE = '1') then
-                    s_NEXT_STATE <= CHECK_DATA;
-                else
-                    s_NEXT_STATE <= READ_DATA;
-                end if;
+                s_NEXT_STATE <= CHECK_DATA when s_DATA_EDGE = '1' else READ_DATA;
             when CHECK_DATA=>
                 s_CHECK_DATA <= '1';
-                if(s_DATA_COUNT /= 31) then
-                    s_NEXT_STATE <= READ_DATA;
-                else
-                    s_NEXT_STATE <= START;
-                end if;
+                s_NEXT_STATE <= READ_DATA when s_DATA_COUNT /= 31 else START;
             when others => s_NEXT_STATE <= START;
         end case;
     end process;
-    
+
     s_DATA_EDGE <= s_DATA_LEAD and (not s_DATA_FOLLOW);
     process(i_CLK)
     begin
-        if(rising_edge(i_CLK)) then
-            if(i_RESET = '0') then
+        if rising_edge(i_CLK) then
+            if i_RESET = '0' then
                 s_DATA_LEAD <= '0';
                 s_DATA_FOLLOW <= '0';
             else    
@@ -154,13 +127,10 @@ begin
 
     process(i_CLK)
     begin
-        if((rising_edge(i_CLK))) then
-            if((i_RESET = '0') or (s_LEAD_ON_COUNT = g_LEADER_CODE_LENGTH+c_PADDING_LENGTH)) then
-                s_LEAD_ON_COUNT <= 0;
-            
-            elsif(s_READ_LEAD_ON = '1') then
+        if rising_edge(i_CLK) then
+            if (s_READ_LEAD_ON = '1' and i_RESET = '1') then
                 s_LEAD_ON_COUNT <= s_LEAD_ON_COUNT + 1;
-            else    
+            else
                 s_LEAD_ON_COUNT <= 0;
             end if;
         end if;
@@ -168,13 +138,10 @@ begin
 
     process(i_CLK)
     begin
-        if((rising_edge(i_CLK))) then
-            if((i_RESET = '0') or (s_LEAD_OFF_COUNT = LEAD_OFF_MAX_LENGTH+c_PADDING_LENGTH)) then
-                s_LEAD_OFF_COUNT <= 0;
-            
-            elsif(s_READ_LEAD_OFF = '1') then
+        if rising_edge(i_CLK) then
+            if (s_READ_LEAD_OFF = '1' and i_RESET = '1') then
                 s_LEAD_OFF_COUNT <= s_LEAD_OFF_COUNT + 1;
-            else    
+            else
                 s_LEAD_OFF_COUNT <= 0;
             end if;
         end if;
@@ -182,14 +149,14 @@ begin
 
     process(i_CLK, s_READ_DATA, s_COUNT)
     begin
-        if((rising_edge(i_CLK))) then
-            if((i_RESET = '0') or (s_READ_DATA = '0') or (s_COUNT = c_ONE_LENGTH+c_PADDING_LENGTH-1)) then
-                s_COUNT <= 0;
-            elsif(s_CURRENT_STATE = READ_DATA) then
+        if rising_edge(i_CLK) then
+            if s_CURRENT_STATE = READ_DATA and i_RESET = '1' then
                 s_COUNT <= s_COUNT + 1;
+            else
+                s_COUNT <= 0;
             end if;
 
-            if(s_COUNT = c_ONE_LENGTH - c_PADDING_LENGTH) then
+            if s_COUNT = c_ONE_LENGTH - c_PADDING_LENGTH then
                 s_DATA_BIT <= '0';
             elsif(s_COUNT = c_ONE_LENGTH + c_PADDING_LENGTH) then
                 s_DATA_BIT <= '0';
@@ -203,20 +170,19 @@ begin
 
     process(i_CLK, s_READ_DATA, s_DATA_COUNT)
     begin
-        if(rising_edge(i_CLK)) then
-            if((i_RESET = '0') or (s_DATA_COUNT = c_MAX_DATA_LENGTH-1)) then
-                s_DATA_COUNT <= 0;
-            elsif(s_READ_DATA = '1') then
+        if rising_edge(i_CLK) then
+            if s_READ_DATA = '1' and i_RESET = '1' then
                 s_DATA_COUNT <= s_DATA_COUNT + 1;
+            else
+                s_DATA_COUNT <= 0;
             end if;
         end if;
     end process;
-    
-    
+
     process(s_READ_DATA)
     begin
-        if(rising_edge(s_READ_DATA)) then
-            s_SHIFT_REG <= s_SHIFT_REG((c_MAX_DATA_LENGTH-1) - 1 downto 0) & s_DATA_BIT;
+        if rising_edge(s_READ_DATA) then
+            s_SHIFT_REG <= s_SHIFT_REG(c_MAX_DATA_LENGTH - 1 - 1 downto 0) & s_DATA_BIT;
         end if;
     end process;
 end Implementation;    
