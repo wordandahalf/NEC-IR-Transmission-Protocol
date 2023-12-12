@@ -1,10 +1,11 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.numeric_std.all;
-use std.textio.all ;
-use ieee.std_logic_textio.all ;
+use IEEE.numeric_std.ALL;
+use std.textio.ALL;
+use ieee.std_logic_textio.ALL;
 
-use work.sim_mem_init.all;
+use work.sim_mem_init.ALL;
+use work.de2_115_seven_segment.ALL;
 
 entity test_RC_receiver is
 end;
@@ -12,23 +13,16 @@ end;
 architecture test of test_RC_receiver is
   
 component RC_receiver
-generic (
-	LC_on_max 					: integer := 450000);
-port (	
-	HEX7						: out std_logic_vector(6 downto 0);
-	HEX6						: out std_logic_vector(6 downto 0);
-	HEX5						: out std_logic_vector(6 downto 0);
-	HEX4						: out std_logic_vector(6 downto 0);
-	HEX3						: out std_logic_vector(6 downto 0);
-	HEX2						: out std_logic_vector(6 downto 0);
-	HEX1						: out std_logic_vector(6 downto 0);
-	HEX0						: out std_logic_vector(6 downto 0);
-		
-	rd_data						: out std_logic;
-			
-	clk							: in std_logic;
-	data_in						: in std_logic;
-	reset						: in std_logic);
+	generic (
+		g_LEADER_CODE_LENGTH : INTEGER := 450000
+	);
+	port(
+		o_HEX       : out SEG_ARR;
+		o_DATA      : out STD_LOGIC;
+		i_CLK       : in  STD_LOGIC;
+		i_DATA      : in  STD_LOGIC;
+		i_RESET     : in  STD_LOGIC
+	);
 end component;
 
 constant LC_on_max 				: integer := 50;
@@ -40,8 +34,7 @@ signal data_in, n_data			: std_logic := '0';
 
 constant num_segs 				: integer := 8;
 constant seg_size 				: integer := 7;
-type seg_arr is array(0 TO num_segs-1) of std_logic_vector(seg_size-1 downto 0);
-signal seg, expected 			: seg_arr := ((others=> (others=>'0')));
+signal seg, expected 			: SEG_ARR := ((others=> (others=>'0')));
 
 constant in_fname 				: string := "NEC_input.csv";
 constant out_fname 				: string := "NEC_output.csv";
@@ -51,9 +44,7 @@ begin
 	n_data <= not data_in; -- data comes into the FPGA inverted
 	dev_to_test:  RC_receiver 
 		generic map(LC_on_max)
-		port map(seg(7), seg(6), seg(5), seg(4), seg(3), seg(2), seg(1), seg(0),
-				rd_data, clk, n_data, reset); 
-
+		port map(seg, rd_data, clk, n_data, reset);
 	stimulus:  process
     variable input_line			: line;
 	variable WriteBuf 			: line;
