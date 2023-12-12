@@ -1,4 +1,10 @@
 work/
+db/
+incremental_db/
+output_files/
+simulation/
+NEC-IR-Transmission-Protocol*
 modelsim.ini
 vsim.wlf
+*.bak
 transcript
